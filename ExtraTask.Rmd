@@ -1,0 +1,175 @@
+---
+title: "Extra Task"
+fontsize: 11pt
+header-includes: \usepackage[german]{babel}
+output:
+  html_document: default
+  pdf_document:
+    highlight: tango
+fig_caption: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, # -> Sollen Code Chunks im gerenderten Dokument angezeigt werden?
+                      eval = TRUE, # -> Sollen R Code Chunks ausgeführt werden?
+                      warning = FALSE, # -> Warnungen sollten nur am Ende zum Rendern auf FALSE gesetzt werden
+                      message = FALSE) # -> Hinweise sollten nur am Ende zum Rendern auf FALSE gesetzt werden
+```
+
+```{r}
+# Set up libraries
+# ...
+
+library(tidyverse)
+library(plotly)
+library(Rtsne)
+library(umap)
+library(ggplot2)
+```
+
+In this exercise sheet, we want to compare different non-linear dimension reduction techniques. We will work with a 3D point cloud that we project into 2D.   
+
+To begin with, we need to load the data. In the zip archive, you can find the file `point_cloud.csv`. Read the csv file of the point cloud.  
+The point cloud is quite large to work with. Reduce it by keeping only every n-th point of it. A value of around n=400 might result in an appropriate performance in the subsequent tasks, depending on your computer specifications. 
+```{r}
+# Load the csv file and select a subset of the rows
+# ...
+# Loaded necessary libraries
+
+
+# Set the value of n for downsampling
+n <- 400
+
+# Read the CSV file
+point_cloud <- read_csv("point_cloud.csv")
+
+# Reduce the point cloud by keeping every n-th point
+reduced_point_cloud <- point_cloud %>%
+  slice(seq(1, nrow(point_cloud), n))
+
+```
+
+Visualize the point cloud in 3D. You may use the `plotly` library to do so. After inspecting the point cloud in 3D, discuss what it might depict.
+```{r}
+# Plot the point cloud in 3D
+# ...
+# Install and loaded required packages
+
+library(plotly)
+
+# Create 3D plot
+plot_ly(reduced_point_cloud, x = ~x, y = ~y, z = ~z, mode = "markers") %>%
+  add_markers()
+
+
+```
+
+What might the point cloud depict?  
+Answer: Based on the spatial arrangement of points, it is highly likely that the point cloud represents an elephant or an object with a strikingly similar silhouette.
+
+
+Use t-SNE to project the point cloud into 2D. You may use the `Rtsne` package to do so. Try different values for the perplexity parameter of t-SNE and plot the different results. Based on your results, discuss which perplexity value seems to preserve the original structure the best. 
+```{r}
+# Perform t-SNE and plot the results
+# ...
+# Loaded necessary library
+
+# Step : Perform t-SNE with different perplexity values and store the results
+perplexity_values <- c(5, 10, 20, 30, 50)
+tSNE_results <- list()
+
+for (perplexity in perplexity_values) {
+  tSNE_results[[as.character(perplexity)]] <- Rtsne(reduced_point_cloud, perplexity = perplexity, dims = 2)
+}
+
+# Step : Plot the different results using plotly
+plots <- list()
+
+for (perplexity in perplexity_values) {
+  tsne_result <- tSNE_results[[as.character(perplexity)]]
+  plot <- plot_ly(x = tsne_result$Y[, 1], y = tsne_result$Y[, 2], type = "scatter", mode = "markers",
+                  marker = list(size = 8),
+                  name = paste0("Perplexity ", perplexity))
+  
+  plots[[as.character(perplexity)]] <- plot
+}
+
+# Combine the plots into one
+final_plot <- subplot(plots)
+
+# Display the final plot
+final_plot
+
+```
+
+Which value for the perplexity works best to preserve the original structure?  
+Answer: As we know in generally, low perplexity values (e.g., 5-30) tend to emphasize the preservation of local structure, making them suitable for datasets with many densely packed clusters or regions with intricate local relationships. On the other hand, higher perplexity values (e.g., 50-100) emphasize the preservation of global structure and are better suited for datasets with well-separated clusters and broader patterns.
+
+In our case i believe that perplexity of 50 is better at preserving the orginal structure in 2D
+
+
+Now, use UMAP to perform the projection. You may refer to the package `umap` to do so. Experiment with the parameters `n_neighbors` and `min_dist` and plot the different results. Discuss which combination of parameter values works best to preserve the original structure.
+```{r}
+# Perform UMAP and plot the results
+# ...
+
+# Perform UMAP with different parameter values and store the results
+n_neighbors_values <- c(5, 10, 20, 30)
+min_dist_values <- c(0.1, 0.2, 0.5, 0.7)
+umap_results <- list()
+
+for (n_neighbors in n_neighbors_values) {
+  for (min_dist in min_dist_values) {
+    key <- paste0("n_neighbors=", n_neighbors, "_min_dist=", min_dist)
+    umap_results[[key]] <- umap(reduced_point_cloud, n_neighbors = n_neighbors, min_dist = min_dist)
+  }
+}
+
+# Plot the different results using plotly
+plots_UMAP <- list()
+
+for (i in 1:length(n_neighbors_values)) {
+  for (j in 1:length(min_dist_values)) {
+    key <- paste0("n_neighbors=", n_neighbors_values[i], "_min_dist=", min_dist_values[j])
+    umap_result <- umap_results[[key]]
+    plot_UMAP <- plot_ly(x = umap_result$layout[, 1], y = umap_result$layout[, 2], type = "scatter", mode = "markers",
+                    marker = list(size = 3),
+                    name = key)
+    
+    plots_UMAP[[key]] <- plot_UMAP
+  }
+}
+
+# Combine the plots into one
+final_plot_UMAP <- subplot(plots_UMAP)
+
+# Display the final plot
+final_plot_UMAP
+
+# Step : Plot the specific result for 'n_neighbors = 30' and 'min_dist = 0.7' using plotly
+specific_key <- "n_neighbors=30_min_dist=0.7"
+specific_umap_result <- umap_results[[specific_key]]
+specific_plot_UMAP <- plot_ly(x = specific_umap_result$layout[, 1], y = specific_umap_result$layout[, 2], type = "scatter", mode = "markers",
+                              marker = list(size = 5),
+                              name = specific_key)
+
+# Customize the layout of the specific plot (optional)
+specific_plot_UMAP <- layout(specific_plot_UMAP, title = "UMAP Plot for n_neighbors = 30, min_dist = 0.7")
+
+# Display the specific plot
+specific_plot_UMAP
+
+```
+
+Which combination of values for `n_neighbors` and `min_dist` works best to preserve the original structure?  
+Answer: We know that generally small n-nighbors and min-distance gives us good result of local structure, where as higher value works well of global structure.
+In our case i feel values for n neighbor 30 and min distance 7 works good for preserving the original structure
+  
+  
+
+Lastly, compare your results from using t-SNE and UMAP. Which method worked best to preserve the original structure of the point cloud?  
+Answer:I believe each and every one of this method have their own boon and bane, but t-SNE works good when we decrease dimensions. But in my case UMAP have preserved
+the original structure most too.
+
+
+------
